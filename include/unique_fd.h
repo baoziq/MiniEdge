@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unistd.h>
+
 class UniqueFd {
 public:
     UniqueFd(int fd = -1);

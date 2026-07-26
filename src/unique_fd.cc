@@ -8,16 +8,15 @@ UniqueFd::UniqueFd(UniqueFd&& other) noexcept : fd_(other.fd_){
 
 UniqueFd& UniqueFd::operator=(UniqueFd&& other) noexcept {
     if (this != &other) {
-        if (valid()) {
-            fd_ = other.fd_;
-            other.fd_ = -1;
-        }
+        reset(other.release());
     }
     return *this;
 }
 
 UniqueFd::~UniqueFd() {
-    fd_ = -1;
+    if (valid()) {
+        close(fd_);
+    }
 }
 
 int UniqueFd::get() const {
@@ -34,6 +33,9 @@ int UniqueFd::release() {
     return fd;
 }
 
-void UniqueFd::reset(int new_fd = -1) {
+void UniqueFd::reset(int new_fd) {
+    if (valid()) {
+        close(fd_);
+    }
     fd_ = new_fd;
 }
