@@ -12,18 +12,13 @@ int main() {
         std::cerr << "set_nonblocking failed: " << std::strerror(errno) << std::endl;
         return 1;
     }
-    int client_fd = accept(listener.fd(), nullptr, nullptr);
-    if (client_fd == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            std::cout << "No int client_fd = ::accept pending connection now\n";
-            return 0;
-        }
-        std::cerr << "accept failed\n" << std::strerror(errno) << std::endl;
-        return 1;
-    }
-    UniqueFd client = listener.accept_connection();
+    std::optional<UniqueFd> client = listener.accept_connection();
+    if (!client.has_value()) {
+        std::cout << "No pending connection now\n";
+        return 0;
+    }   
     char buffer[1024];
-    ssize_t n = read(client.get(), buffer, sizeof(buffer));
+    ssize_t n = read(client->get(), buffer, sizeof(buffer));
     if (n > 0 ) {
         write(STDOUT_FILENO, buffer, n);
     }

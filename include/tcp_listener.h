@@ -2,6 +2,7 @@
 
 #include "unique_fd.h"
 
+#include <algorithm>
 #include <stdint.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -10,7 +11,7 @@
 #include <fcntl.h>
 #include <cerrno>
 #include <system_error>
-
+#include <optional>
 class Listener {
 public:
     Listener(const Listener&) = delete;
@@ -23,7 +24,7 @@ public:
     int fd() const noexcept {
         return fd_.get();
     }
-    UniqueFd accept_connection() const;
+    std::optional<UniqueFd> accept_connection() const;
 
 private:
     explicit Listener(UniqueFd fd) : fd_(std::move(fd)) {}

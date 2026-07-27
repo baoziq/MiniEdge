@@ -1,4 +1,6 @@
 #include "tcp_listener.h"
+#include "unique_fd.h"
+#include <optional>
 
 Listener Listener::create(uint16_t port) {
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -44,14 +46,18 @@ Listener Listener::create(uint16_t port) {
     return Listener(std::move(fd));
 }
 
-UniqueFd Listener::accept_connection() const {
+std::optional<UniqueFd> Listener::accept_connection() const {
     int client_fd = accept(fd_.get(), nullptr, nullptr);
-    if (client_fd < 0) {
-        throw std::system_error {
-            errno,
-            std::generic_category(),
-            "accept"
-        };
+    if (client_fd > 0) {
+        return UniqueFd(client_fd);
     }
-    return UniqueFd(client_fd);
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        return std::nullopt;
+    }
+
+    throw std::system_error(
+        errno,
+        std::generic_category(),
+        "accept"
+    );
 }

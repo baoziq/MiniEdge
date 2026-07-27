@@ -7,5 +7,5 @@ int set_nonblocking(int fd) {
     if (flags < 0) {
         return -1;
     }
-    return fcntl(fd, F_SETFL, 0);
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
