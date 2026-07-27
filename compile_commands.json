@@ -1,0 +1,26 @@
+[
+{
+  "directory": "/home/ubuntu/MiniEdge/build",
+  "command": "/usr/bin/c++  -I/home/ubuntu/MiniEdge/include -Wall -Wextra -Wpedantic -o CMakeFiles/miniedge.dir/src/tcp_listener.cc.o -c /home/ubuntu/MiniEdge/src/tcp_listener.cc",
+  "file": "/home/ubuntu/MiniEdge/src/tcp_listener.cc",
+  "output": "CMakeFiles/miniedge.dir/src/tcp_listener.cc.o"
+},
+{
+  "directory": "/home/ubuntu/MiniEdge/build",
+  "command": "/usr/bin/c++  -I/home/ubuntu/MiniEdge/include -Wall -Wextra -Wpedantic -o CMakeFiles/miniedge.dir/src/unique_fd.cc.o -c /home/ubuntu/MiniEdge/src/unique_fd.cc",
+  "file": "/home/ubuntu/MiniEdge/src/unique_fd.cc",
+  "output": "CMakeFiles/miniedge.dir/src/unique_fd.cc.o"
+},
+{
+  "directory": "/home/ubuntu/MiniEdge/build",
+  "command": "/usr/bin/c++  -I/home/ubuntu/MiniEdge/include -Wall -Wextra -Wpedantic -o CMakeFiles/miniedge.dir/src/common.cc.o -c /home/ubuntu/MiniEdge/src/common.cc",
+  "file": "/home/ubuntu/MiniEdge/src/common.cc",
+  "output": "CMakeFiles/miniedge.dir/src/common.cc.o"
+},
+{
+  "directory": "/home/ubuntu/MiniEdge/build",
+  "command": "/usr/bin/c++  -I/home/ubuntu/MiniEdge/include -Wall -Wextra -Wpedantic -o CMakeFiles/miniedge_server.dir/src/main.cc.o -c /home/ubuntu/MiniEdge/src/main.cc",
+  "file": "/home/ubuntu/MiniEdge/src/main.cc",
+  "output": "CMakeFiles/miniedge_server.dir/src/main.cc.o"
+}
+]

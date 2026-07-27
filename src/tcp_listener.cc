@@ -10,8 +10,8 @@ Listener Listener::create(uint16_t port) {
         };
     }
     UniqueFd fd(listen_fd);
-    
     int optval = 1;
+    
     if (setsockopt(fd.get(), SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
         throw std::system_error {
             errno,

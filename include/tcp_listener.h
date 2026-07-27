@@ -20,7 +20,6 @@ public:
     Listener& operator=(Listener&&) noexcept = default;
 
     static Listener create(uint16_t port);
-
     int fd() const noexcept {
         return fd_.get();
     }
