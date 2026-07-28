@@ -34,34 +34,39 @@ int main() {
         return 1;
     }
     epoll_event events[16];
-    int ready = epoll_wait(epoller.get(), &events[0], 16, -1);
-    if (ready < 0) {
-        throw std::system_error {
-            errno,
-            std::generic_category(),
-            "epoll_wait"
-        };
-        return 1;
-    }
-
-    for (int i = 0; i < ready; i++) {
-        int fd = events[i].data.fd;
-        if (fd == listener.fd()) {
-            // new connection coming
-            std::cout << "new connection comming\n";
-            std::optional<UniqueFd> client = listener.accept_connection();
-            if (!client.has_value()) {
-                std::cout << "No pending connection now\n";
-                return 0;
-            }
-        } else {
-            char buffer[1024];
-            ssize_t n = read(fd, buffer, sizeof(buffer));
-            if (n > 0 ){
-                write(STDOUT_FILENO, buffer, n);
+    
+    while (true) {
+        int ready = epoll_wait(epoller.get(), &events[0], 16, -1);
+        if (ready < 0) {
+            throw std::system_error {
+                errno,
+                std::generic_category(),
+                "epoll_wait"
+            };
+            return 1;
+        }
+        for (int i = 0; i < ready; i++) {
+            int fd = events[i].data.fd;
+            if (fd == listener.fd()) {
+                // new connection coming
+                std::cout << "new connection comming\n";
+                std::optional<UniqueFd> client = listener.accept_connection();
+                set_nonblocking(client->get());
+                epoll_ctl(epoller.get(), EPOLL_CTL_ADD, client->get(), &event);
+                if (!client.has_value()) {
+                    std::cout << "No pending connection now\n";
+                    return 0;
+                }
+            } else {
+                char buffer[1024];
+                ssize_t n = read(fd, buffer, sizeof(buffer));
+                if (n > 0 ){
+                    write(STDOUT_FILENO, buffer, n);
+                }
             }
         }
     }
+    
 
     return 0;
 
