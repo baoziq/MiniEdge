@@ -43,3 +43,8 @@ target_compile_options(miniedge_server
         -Wextra
         -Wpedantic
 )
+
+target_compile_options(miniedge_server PRIVATE
+    $<$<CONFIG:Debug>:-g>
+    $<$<CONFIG:Debug>:-O0>
+)
