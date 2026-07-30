@@ -9,6 +9,7 @@ add_library(miniedge
     src/tcp_listener.cc
     src/unique_fd.cc
     src/common.cc
+    src/epoller.cc
 )
 
 target_include_directories(miniedge

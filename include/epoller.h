@@ -1,0 +1,19 @@
+#include "unique_fd.h"
+#include <cerrno>
+#include <cstdint>
+
+#include <sys/epoll.h>
+#include <vector>
+
+class Epoller {
+public:
+    explicit Epoller(std::size_t max_events);
+    void add(int fd, std::uint32_t events);
+    void remove(int fd);
+    int wait(int timeout_ms = -1);
+
+    const epoll_event& event(std::size_t index) const;
+private:
+    UniqueFd epoll_fd_;
+    std::vector<epoll_event> events;
+};
