@@ -48,7 +48,7 @@ Listener Listener::create(uint16_t port) {
 
 std::optional<UniqueFd> Listener::accept_connection() const {
     int client_fd = accept(fd_.get(), nullptr, nullptr);
-    if (client_fd > 0) {
+    if (client_fd >= 0) {
         return UniqueFd(client_fd);
     }
     if (errno == EAGAIN || errno == EWOULDBLOCK) {

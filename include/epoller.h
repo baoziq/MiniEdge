@@ -1,7 +1,9 @@
-#include "unique_fd.h"
-#include <cerrno>
-#include <cstdint>
+#pragma once
 
+#include "unique_fd.h"
+
+#include <cstddef>
+#include <cstdint>
 #include <sys/epoll.h>
 #include <vector>
 
@@ -15,5 +17,5 @@ public:
     const epoll_event& event(std::size_t index) const;
 private:
     UniqueFd epoll_fd_;
-    std::vector<epoll_event> events;
+    std::vector<epoll_event> events_;
 };

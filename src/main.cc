@@ -9,14 +9,12 @@
 #include <cstring>
 #include <iostream>
 #include <cstddef>
-#include <optional>
 #include <sys/epoll.h>
-#include <system_error>
 #include <unistd.h>
 #include <unordered_map>
 
 int main() {
-    std::unordered_map<int, std::optional<UniqueFd>> connection;
+    std::unordered_map<int, UniqueFd> connections;
 
     Listener listener = Listener::create(8001);
     if (set_nonblocking(listener.fd()) < 0) {
@@ -32,16 +30,21 @@ int main() {
             if (fd == listener.fd()) {
                 // new connection coming
                 std::cout << "new connection comming\n";
-                std::optional<UniqueFd> client = listener.accept_connection();
+                auto client = listener.accept_connection();
                 if (!client.has_value()) {
                     std::cout << "No pending connection now\n";
-                    return 0;
+                    continue;
                 }
-                set_nonblocking(client->get());
-                epoller.add(client->get(), EPOLLIN);
-                connection[client->get()] = std::move(client);
+                if (set_nonblocking(client->get()) < 0) {
+                    std::cerr << "set_nonblocking client failed: "
+                              << std::strerror(errno) << '\n';
+                    continue;
+                }
+                int client_fd = client->get();
+                epoller.add(client_fd, EPOLLIN);
+                connections.emplace(client_fd, std::move(*client));
             } else {
-                if (connection.find(fd) == connection.end()) {
+                if (connections.find(fd) == connections.end()) {
                     continue;
                 }
                 char buffer[1024];
@@ -51,17 +54,17 @@ int main() {
                 } else if (n == 0) {
                     std::cout << "connection has closed\n";
                     epoller.remove(fd);
-                    connection.erase(fd);
+                    connections.erase(fd);
                 } else {
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
                         continue;
+                    } else if (errno == EINTR) {
+                        continue;
                     } else {
-                        throw std::system_error {
-                            errno,
-                            std::generic_category(),
-                            "read"
-                        };
-                        return 1;
+                        std::cerr << "read failed for fd " << fd << ": "
+                                  << std::strerror(errno) << '\n';
+                        epoller.remove(fd);
+                        connections.erase(fd);
                     }
                 }
             }
