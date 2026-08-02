@@ -10,6 +10,7 @@ add_library(miniedge
     src/unique_fd.cc
     src/common.cc
     src/epoller.cc
+    src/connection.cc
 )
 
 target_include_directories(miniedge

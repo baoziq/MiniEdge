@@ -2,6 +2,7 @@
 #include "tcp_listener.h"
 #include "common.h"
 #include "epoller.h"
+#include "connection.h"
 
 #include <cerrno>
 #include <climits>
@@ -14,7 +15,7 @@
 #include <unordered_map>
 
 int main() {
-    std::unordered_map<int, UniqueFd> connections;
+    std::unordered_map<int, Connection> connections;
 
     Listener listener = Listener::create(8001);
     if (set_nonblocking(listener.fd()) < 0) {
@@ -41,32 +42,21 @@ int main() {
                     continue;
                 }
                 int client_fd = client->get();
+                Connection connection(std::move(*client));
+                connections.emplace(client_fd, std::move(connection));
                 epoller.add(client_fd, EPOLLIN);
-                connections.emplace(client_fd, std::move(*client));
             } else {
-                if (connections.find(fd) == connections.end()) {
+                auto it = connections.find(fd);
+                if (it == connections.end()) {
                     continue;
                 }
-                char buffer[1024];
-                ssize_t n = read(fd, buffer, sizeof(buffer));
-                if (n > 0 ){
-                    write(STDOUT_FILENO, buffer, n);
-                } else if (n == 0) {
-                    std::cout << "connection has closed\n";
-                    epoller.remove(fd);
+                Connection& connection = it->second;
+                auto flag = connection.handle_read();
+                if (flag == ReadResult::KError || flag == ReadResult::KPeerClosed) {
                     connections.erase(fd);
-                } else {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        continue;
-                    } else if (errno == EINTR) {
-                        continue;
-                    } else {
-                        std::cerr << "read failed for fd " << fd << ": "
-                                  << std::strerror(errno) << '\n';
-                        epoller.remove(fd);
-                        connections.erase(fd);
-                    }
+                    epoller.remove(fd);
                 }
+                std::cout << connection.input() << std::endl;
             }
         }
     }
