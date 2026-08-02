@@ -1,7 +1,10 @@
+#pragma once
 #include "unique_fd.h"
 
 #include <string_view>
 #include <string>
+
+static constexpr std::size_t KMaxInputSize = 1024 * 1024;
 
 enum class ReadResult {
     KDataAvailable,

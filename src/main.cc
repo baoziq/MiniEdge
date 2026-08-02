@@ -53,8 +53,9 @@ int main() {
                 Connection& connection = it->second;
                 auto flag = connection.handle_read();
                 if (flag == ReadResult::KError || flag == ReadResult::KPeerClosed) {
-                    connections.erase(fd);
                     epoller.remove(fd);
+                    connections.erase(fd);
+                    continue;
                 }
                 std::cout << connection.input() << std::endl;
             }
