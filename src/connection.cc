@@ -1,10 +1,13 @@
 #include "connection.h"
 #include "unique_fd.h"
 #include <cerrno>
+#include <cstddef>
 #include <stdexcept>
+#include <sys/socket.h>
+#include <system_error>
 #include <unistd.h>
 
-Connection::Connection(UniqueFd fd) : fd_(std::move(fd)), input_buffer_() {}
+Connection::Connection(UniqueFd fd) : fd_(std::move(fd)), input_buffer_(), output_buffer_() {}
 
 int Connection::fd() const noexcept {
     return fd_.get();
@@ -32,7 +35,7 @@ ReadResult Connection::handle_read() {
 }
 
 void Connection::consume(std::size_t length) {
-    if (length > input_buffer_.size() || input_buffer_.empty()) {
+    if (length > input_buffer_.size()) {
         throw std::out_of_range("consume length exceeds input size");
     }
     input_buffer_.erase(0, length);
@@ -40,4 +43,53 @@ void Connection::consume(std::size_t length) {
 
 std::string_view Connection::input() const noexcept {
     return input_buffer_;
+}
+
+bool Connection::queue_output(std::string_view data) {
+    if (data.size() > KMaxInputSize - output_buffer_.size()) {
+        throw std::out_of_range("queue_output index out of max");
+        return false;
+    }
+    output_buffer_.append(data);
+    return true;
+}
+
+WriteResult Connection::handle_write() {
+    if (!output_buffer_.empty()) {
+        write_offset_ = 0;
+        return WriteResult::KDrained;
+    }
+
+    while (true) {
+        size_t remaining = output_buffer_.size() - write_offset_;
+        size_t n = send(fd_.get(), output_buffer_.data() + write_offset_, remaining, MSG_NOSIGNAL);
+        if (n > 0 && n < remaining) {
+            write_offset_ += n;
+            continue;
+        } else if (n == static_cast<size_t>(-1) && errno == EINTR) {
+            continue;
+        } else if (n == static_cast<size_t>(-1) && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            return WriteResult::KWouldBlock;
+        } else if (n == remaining) {
+            output_buffer_.clear();
+            write_offset_ = 0;
+            return WriteResult::KDrained;
+        } else {
+            throw std::system_error {
+                errno,
+                std::generic_category(),
+                "send"
+            };
+            return WriteResult::KError;
+        }
+
+    }
+}
+
+bool Connection::has_pending_output() const noexcept {
+    return !output_buffer_.empty();
+}
+
+std::size_t Connection::pending_output_size() const noexcept {
+    return output_buffer_.size() - write_offset_;
 }
