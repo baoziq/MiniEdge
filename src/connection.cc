@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <stdexcept>
 #include <sys/socket.h>
-#include <system_error>
 #include <unistd.h>
 
 Connection::Connection(UniqueFd fd) : fd_(std::move(fd)), input_buffer_(), output_buffer_() {}
@@ -55,35 +54,39 @@ bool Connection::queue_output(std::string_view data) {
 }
 
 WriteResult Connection::handle_write() {
-    if (!output_buffer_.empty()) {
+    if (output_buffer_.empty()) {
         write_offset_ = 0;
         return WriteResult::KDrained;
     }
 
-    while (true) {
-        size_t remaining = output_buffer_.size() - write_offset_;
-        size_t n = send(fd_.get(), output_buffer_.data() + write_offset_, remaining, MSG_NOSIGNAL);
-        if (n > 0 && n < remaining) {
-            write_offset_ += n;
+    while (write_offset_ < output_buffer_.size()) {
+        const std::size_t remaining = output_buffer_.size() - write_offset_;
+        const ssize_t n = send(
+            fd_.get(),
+            output_buffer_.data() + write_offset_,
+            remaining,
+            MSG_NOSIGNAL
+        );
+
+        if (n > 0) {
+            write_offset_ += static_cast<std::size_t>(n);
             continue;
-        } else if (n == static_cast<size_t>(-1) && errno == EINTR) {
-            continue;
-        } else if (n == static_cast<size_t>(-1) && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            return WriteResult::KWouldBlock;
-        } else if (n == remaining) {
-            output_buffer_.clear();
-            write_offset_ = 0;
-            return WriteResult::KDrained;
-        } else {
-            throw std::system_error {
-                errno,
-                std::generic_category(),
-                "send"
-            };
-            return WriteResult::KError;
         }
 
+        if (n < 0 && errno == EINTR) {
+            continue;
+        }
+
+        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            return WriteResult::KWouldBlock;
+        }
+
+        return WriteResult::KError;
     }
+
+    output_buffer_.clear();
+    write_offset_ = 0;
+    return WriteResult::KDrained;
 }
 
 bool Connection::has_pending_output() const noexcept {
