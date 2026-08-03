@@ -46,7 +46,6 @@ std::string_view Connection::input() const noexcept {
 
 bool Connection::queue_output(std::string_view data) {
     if (data.size() > KMaxInputSize - output_buffer_.size()) {
-        throw std::out_of_range("queue_output index out of max");
         return false;
     }
     output_buffer_.append(data);
