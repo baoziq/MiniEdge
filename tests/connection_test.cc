@@ -42,12 +42,11 @@ int main() {
                     continue;
                 }
                 int client_fd = client->get();
+                // Connection connection(std::move(*client));
+                // connections.emplace(client_fd, std::move(connection));
+                // epoller.add(client_fd, EPOLLIN);
                 Connection connection(std::move(*client));
-                auto [it, inserted] = connections.try_emplace(client_fd, std::move(connection));
-                if (!inserted) {
-                    continue;
-                }
-                epoller.add(client_fd, EPOLLIN);
+                connections.emplace(client_fd, connection);
             } else {
                 auto it = connections.find(fd);
                 if (it == connections.end()) {

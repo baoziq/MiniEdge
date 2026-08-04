@@ -21,6 +21,12 @@ enum class WriteResult {
 class Connection {
 public:
     explicit Connection(UniqueFd fd);
+    Connection(const Connection&) = delete;
+    Connection& operator=(const Connection&) = delete;
+
+    Connection(Connection&&) = default;
+    Connection& operator=(Connection&&) = default;
+
     int fd() const noexcept;
     ReadResult handle_read();
     std::string_view input() const noexcept;
@@ -38,3 +44,8 @@ private:
     std::string output_buffer_;
     std::size_t write_offset_{0};
 };
+
+static_assert(!std::is_copy_constructible_v<Connection>);
+static_assert(!std::is_copy_assignable_v<Connection>);
+static_assert(std::is_move_constructible_v<Connection>);
+static_assert(std::is_move_assignable_v<Connection>);
