@@ -74,6 +74,7 @@ int main() {
                     if (connection.has_pending_output()) {
                         auto write_flag = connection.handle_write();
                         if (write_flag == WriteResult::KDrained) {
+                            epoller.modify(fd, kReadEvents);
                             continue;
                         } else if (write_flag == WriteResult::KWouldBlock) {
                             epoller.modify(fd, kReadEvents | EPOLLOUT);
@@ -93,6 +94,7 @@ int main() {
                 if (event & EPOLLOUT) {
                     auto write_flag = connection.handle_write();
                     if (write_flag == WriteResult::KDrained) {
+                        epoller.modify(fd, kReadEvents);
                         continue;
                     } else if (write_flag == WriteResult::KWouldBlock) {
                         epoller.modify(fd, kReadEvents | EPOLLOUT);
@@ -103,11 +105,6 @@ int main() {
                         continue;
                     }
 
-                    if (connection.has_pending_output()) {
-                        continue;
-                    } else {
-                        epoller.modify(fd, kReadEvents);
-                    }
                 }
 
             }
