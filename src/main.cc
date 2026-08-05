@@ -6,10 +6,12 @@
 
 #include <cerrno>
 #include <climits>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <cstddef>
+#include <stdexcept>
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <unordered_map>
@@ -28,6 +30,7 @@ int main() {
         int ready = epoller.wait(-1);
         for (int i = 0; i < ready; i++) {
             int fd = epoller.event(i).data.fd;
+            std::uint32_t event = epoller.event(i).events;
             if (fd == listener.fd()) {
                 // new connection coming
                 std::cout << "new connection comming\n";
@@ -47,20 +50,66 @@ int main() {
                 if (!inserted) {
                     continue;
                 }
-                epoller.add(client_fd, EPOLLIN);
+                epoller.add(client_fd, kReadEvents);
             } else {
                 auto it = connections.find(fd);
                 if (it == connections.end()) {
                     continue;
                 }
                 Connection& connection = it->second;
-                auto flag = connection.handle_read();
-                if (flag == ReadResult::KError || flag == ReadResult::KPeerClosed) {
-                    epoller.remove(fd);
-                    connections.erase(fd);
-                    continue;
+                if (event & EPOLLIN) {
+                    auto read_flag = connection.handle_read();
+                    if (read_flag == ReadResult::KError || read_flag == ReadResult::KPeerClosed) {
+                        epoller.remove(fd);
+                        connections.erase(fd);
+                        continue;
+                    }
+                    // 读完
+                    std::string_view str = connection.input();
+                    if (!connection.queue_output(str)) {
+                        throw std::out_of_range("queue_output");
+                    }
+                    connection.consume(str.size());
+
+                    if (connection.has_pending_output()) {
+                        auto write_flag = connection.handle_write();
+                        if (write_flag == WriteResult::KDrained) {
+                            continue;
+                        } else if (write_flag == WriteResult::KWouldBlock) {
+                            epoller.modify(fd, kReadEvents | EPOLLOUT);
+                            continue;
+                        } else {
+                            epoller.remove(fd);
+                            connections.erase(fd);
+                            continue;
+                        }
+                    }
+                    if (connection.has_pending_output()) {
+                        epoller.modify(fd, EPOLLOUT);
+                    }
+                    
                 }
-                std::cout << connection.input() << std::endl;
+                
+                if (event & EPOLLOUT) {
+                    auto write_flag = connection.handle_write();
+                    if (write_flag == WriteResult::KDrained) {
+                        continue;
+                    } else if (write_flag == WriteResult::KWouldBlock) {
+                        epoller.modify(fd, kReadEvents | EPOLLOUT);
+                        continue;
+                    } else {
+                        epoller.remove(fd);
+                        connections.erase(fd);
+                        continue;
+                    }
+
+                    if (connection.has_pending_output()) {
+                        continue;
+                    } else {
+                        epoller.modify(fd, kReadEvents);
+                    }
+                }
+
             }
         }
     }

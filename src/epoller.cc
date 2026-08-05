@@ -48,6 +48,19 @@ void Epoller::remove(int fd) {
     }
 }
 
+void Epoller::modify(int fd, std::uint32_t events) {
+    epoll_event event{};
+    event.events = events;
+    event.data.fd = fd;
+    if (epoll_ctl(epoll_fd_.get(), EPOLL_CTL_MOD, fd, &event) < 0) {
+        throw std::system_error {
+            errno,
+            std::generic_category(),
+            "epoll_mod"
+        };
+    }
+}
+
 int Epoller::wait(int timeout_ms) {
     int ready;
     do {
