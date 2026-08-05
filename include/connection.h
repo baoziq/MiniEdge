@@ -1,10 +1,13 @@
 #pragma once
 #include "unique_fd.h"
 
-#include <string_view>
+#include <cstddef>
 #include <string>
+#include <string_view>
+#include <type_traits>
 
-static constexpr std::size_t KMaxInputSize = 1024 * 1024;
+inline constexpr std::size_t KMaxInputSize = 1024 * 1024;
+inline constexpr std::size_t KMaxOutputSize = 1024 * 1024;
 
 enum class ReadResult {
     KDataAvailable,
@@ -37,12 +40,14 @@ public:
 
     bool has_pending_output() const noexcept;
     std::size_t pending_output_size() const noexcept;
+    bool peer_closed() const noexcept;
 
 private:
     UniqueFd fd_;
     std::string input_buffer_;
     std::string output_buffer_;
     std::size_t write_offset_{0};
+    bool peer_closed_{false};
 };
 
 static_assert(!std::is_copy_constructible_v<Connection>);

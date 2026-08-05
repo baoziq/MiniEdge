@@ -17,11 +17,13 @@ ReadResult Connection::handle_read() {
     while (true) {
         ssize_t n = read(fd_.get(), &buffer, sizeof(buffer));
         if (n > 0) {
-            input_buffer_.append(buffer, static_cast<std::size_t>(n));
-            if (input_buffer_.size() >= KMaxInputSize) {
+            const auto length = static_cast<std::size_t>(n);
+            if (length > KMaxInputSize - input_buffer_.size()) {
                 return ReadResult::KError;
             }
+            input_buffer_.append(buffer, length);
         } else if (n == 0) {
+            peer_closed_ = true;
             return ReadResult::KPeerClosed;
         } else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             return ReadResult::KDataAvailable;
@@ -45,9 +47,15 @@ std::string_view Connection::input() const noexcept {
 }
 
 bool Connection::queue_output(std::string_view data) {
-    if (data.size() > KMaxInputSize - output_buffer_.size()) {
+    if (data.size() > KMaxOutputSize - pending_output_size()) {
         return false;
     }
+
+    if (write_offset_ > 0) {
+        output_buffer_.erase(0, write_offset_);
+        write_offset_ = 0;
+    }
+
     output_buffer_.append(data);
     return true;
 }
@@ -89,9 +97,13 @@ WriteResult Connection::handle_write() {
 }
 
 bool Connection::has_pending_output() const noexcept {
-    return !output_buffer_.empty();
+    return pending_output_size() > 0;
 }
 
 std::size_t Connection::pending_output_size() const noexcept {
     return output_buffer_.size() - write_offset_;
+}
+
+bool Connection::peer_closed() const noexcept {
+    return peer_closed_;
 }

@@ -11,18 +11,35 @@
 #include <cstring>
 #include <iostream>
 #include <cstddef>
-#include <stdexcept>
 #include <sys/epoll.h>
+#include <system_error>
 #include <unistd.h>
 #include <unordered_map>
 
-int main() {
+using Connections = std::unordered_map<int, Connection>;
+
+void close_connection(Epoller& epoller, Connections& connections,
+                      Connections::iterator it) noexcept {
+    const int fd = it->first;
+    try {
+        epoller.remove(fd);
+    } catch (const std::system_error& error) {
+        std::cerr << "failed to remove fd " << fd
+                  << " from epoll: " << error.what() << '\n';
+    }
+    connections.erase(it);
+}
+
+void run_server() {
     std::unordered_map<int, Connection> connections;
 
     Listener listener = Listener::create(8001);
     if (set_nonblocking(listener.fd()) < 0) {
-        std::cerr << "set_nonblocking failed: " << std::strerror(errno) << std::endl;
-        return 1;
+        throw std::system_error(
+            errno,
+            std::generic_category(),
+            "set_nonblocking listener"
+        );
     }
     Epoller epoller(1024);
     epoller.add(listener.fd(), EPOLLIN);
@@ -57,60 +74,70 @@ int main() {
                     continue;
                 }
                 Connection& connection = it->second;
-                if (event & EPOLLIN) {
-                    auto read_flag = connection.handle_read();
-                    if (read_flag == ReadResult::KError || read_flag == ReadResult::KPeerClosed) {
-                        epoller.remove(fd);
-                        connections.erase(fd);
-                        continue;
-                    }
-                    // 读完
-                    std::string_view str = connection.input();
-                    if (!connection.queue_output(str)) {
-                        throw std::out_of_range("queue_output");
-                    }
-                    connection.consume(str.size());
+                bool close = (event & EPOLLERR) != 0;
+                bool queued_output = false;
 
-                    if (connection.has_pending_output()) {
-                        auto write_flag = connection.handle_write();
-                        if (write_flag == WriteResult::KDrained) {
-                            epoller.modify(fd, kReadEvents);
-                            continue;
-                        } else if (write_flag == WriteResult::KWouldBlock) {
-                            epoller.modify(fd, kReadEvents | EPOLLOUT);
-                            continue;
-                        } else {
-                            epoller.remove(fd);
-                            connections.erase(fd);
-                            continue;
+                if (!close && !connection.peer_closed() &&
+                    (event & (EPOLLIN | EPOLLRDHUP))) {
+                    auto read_flag = connection.handle_read();
+                    if (read_flag == ReadResult::KError) {
+                        close = true;
+                    }
+
+                    if (!close) {
+                        std::string_view input = connection.input();
+                        if (!input.empty()) {
+                            const std::size_t length = input.size();
+                            if (!connection.queue_output(input)) {
+                                close = true;
+                            } else {
+                                connection.consume(length);
+                                queued_output = true;
+                            }
                         }
                     }
-                    if (connection.has_pending_output()) {
-                        epoller.modify(fd, EPOLLOUT);
-                    }
-                    
                 }
-                
-                if (event & EPOLLOUT) {
+
+                if (!close && connection.has_pending_output() &&
+                    ((event & EPOLLOUT) || queued_output)) {
                     auto write_flag = connection.handle_write();
-                    if (write_flag == WriteResult::KDrained) {
-                        epoller.modify(fd, kReadEvents);
-                        continue;
-                    } else if (write_flag == WriteResult::KWouldBlock) {
-                        epoller.modify(fd, kReadEvents | EPOLLOUT);
-                        continue;
-                    } else {
-                        epoller.remove(fd);
-                        connections.erase(fd);
-                        continue;
+                    if (write_flag == WriteResult::KError) {
+                        close = true;
                     }
-
                 }
 
+                if (!close && (event & EPOLLHUP)) {
+                    close = true;
+                }
+
+                if (!close && connection.peer_closed() &&
+                    !connection.has_pending_output()) {
+                    close = true;
+                }
+
+                if (close) {
+                    close_connection(epoller, connections, it);
+                    continue;
+                }
+
+                std::uint32_t interests = connection.peer_closed()
+                    ? 0U
+                    : kReadEvents;
+                if (connection.has_pending_output()) {
+                    interests |= EPOLLOUT;
+                }
+                epoller.modify(fd, interests);
             }
         }
     }
-    
-    return 0;
+}
 
+int main() {
+    try {
+        run_server();
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << "fatal error: " << error.what() << '\n';
+        return 1;
+    }
 }
