@@ -74,26 +74,64 @@ void run_server() {
                 if (it == connections.end()) {
                     continue;
                 }
-                bool closed = false;
                 Connection& connection = it->second;
-                auto read_flag = connection.handle_read();
-                if (read_flag == ReadResult::KError) {
-                    closed = true;
-                } else if (read_flag == ReadResult::KPeerClosed) {
-                    closed = true;
+                bool close = (event & EPOLLERR) != 0;
+                bool queued_output = false;
+
+                if (!close && !connection.peer_closed() &&
+                    (event & (EPOLLIN | EPOLLRDHUP))) {
+                    auto read_flag = connection.handle_read();
+                    if (read_flag == ReadResult::KError) {
+                        close = true;
+                    }
                 }
-                auto header_flag = parse_header(connection.input());
-                if (header_flag.status == HeaderParseStatus::KTooLarge) {
-                    closed = true;
-                }
-                if (header_flag.status == HeaderParseStatus::KComplete) {
-                    connection.tmp_send();
-                    connection.consume(connection.input().size());
-                }
-                if (closed) {
-                    close_connection(epoller, connections, it);
+                while (!close) {
+                    const auto result = parse_header(connection.input());
+
+                    if (result.status == HeaderParseStatus::KIncomplete) {
+                        break;
+                    }
+                    if (result.status == HeaderParseStatus::KTooLarge) {
+                        close = true;
+                        break;
+                    }
+                    if (!connection.queue_output(response)) {
+                        close = true;
+                        break;
+                    }
+                    connection.consume(result.length);
+                    queued_output = true;
                 }
                 
+                if (!close && connection.has_pending_output() &&
+                    ((event & EPOLLOUT) || queued_output)) {
+                    auto write_flag = connection.handle_write();
+                    if (write_flag == WriteResult::KError) {
+                        close = true;
+                    }
+                }
+
+                if (!close && (event & EPOLLHUP)) {
+                    close = true;
+                }
+
+                if (!close && connection.peer_closed() &&
+                    !connection.has_pending_output()) {
+                    close = true;
+                }
+
+                if (close) {
+                    close_connection(epoller, connections, it);
+                    continue;
+                }
+
+                std::uint32_t interests = connection.peer_closed()
+                    ? 0U
+                    : kReadEvents;
+                if (connection.has_pending_output()) {
+                    interests |= EPOLLOUT;
+                }
+                epoller.modify(fd, interests);
             }
         }
     }

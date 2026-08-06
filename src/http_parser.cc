@@ -1,16 +1,17 @@
 #include "http_parser.h"
+#include "connection.h"
 
 HeaderParseResult parse_header(std::string_view input) {
-    HeaderParseResult res{HeaderParseStatus::KIncomplete, 0};
-    auto it = input.find("\r\n\r\n");
-    if (it == std::string::npos) {
-        return res;
+    const auto index = input.find("\r\n\r\n");
+    if (index == std::string::npos) {
+        if (input.size() > KMaxInputSize) {
+            return {HeaderParseStatus::KTooLarge, 0};
+        }
+        return {HeaderParseStatus::KIncomplete, 0};
     }
-    if (it > kMaxHeaderSize) {
-        res.status = HeaderParseStatus::KTooLarge;
-        return res;
+    const std::size_t length = index + 4;
+    if (length > KMaxInputSize) {
+        return {HeaderParseStatus::KTooLarge, 0};
     }
-    res.status = HeaderParseStatus::KComplete;
-    res.length = it;
-    return res;
+    return {HeaderParseStatus::KComplete, length};
 }
