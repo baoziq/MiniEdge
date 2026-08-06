@@ -107,3 +107,13 @@ std::size_t Connection::pending_output_size() const noexcept {
 bool Connection::peer_closed() const noexcept {
     return peer_closed_;
 }
+
+void Connection::tmp_send() {
+    constexpr std::string_view response =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Length: 2\r\n"
+    "Connection: keep-alive\r\n"
+    "\r\n"
+    "OK";
+    send(fd_.get(), &response, sizeof(response), MSG_NOSIGNAL);
+}

@@ -41,7 +41,7 @@ public:
     bool has_pending_output() const noexcept;
     std::size_t pending_output_size() const noexcept;
     bool peer_closed() const noexcept;
-
+    void tmp_send();
 private:
     UniqueFd fd_;
     std::string input_buffer_;

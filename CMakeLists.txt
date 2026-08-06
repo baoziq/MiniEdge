@@ -11,6 +11,7 @@ add_library(miniedge
     src/common.cc
     src/epoller.cc
     src/connection.cc
+    src/http_parser.cc
 )
 
 target_include_directories(miniedge

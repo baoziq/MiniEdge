@@ -3,6 +3,7 @@
 #include "common.h"
 #include "epoller.h"
 #include "connection.h"
+#include "http_parser.h"
 
 #include <cerrno>
 #include <climits>
@@ -73,60 +74,26 @@ void run_server() {
                 if (it == connections.end()) {
                     continue;
                 }
+                bool closed = false;
                 Connection& connection = it->second;
-                bool close = (event & EPOLLERR) != 0;
-                bool queued_output = false;
-
-                if (!close && !connection.peer_closed() &&
-                    (event & (EPOLLIN | EPOLLRDHUP))) {
-                    auto read_flag = connection.handle_read();
-                    if (read_flag == ReadResult::KError) {
-                        close = true;
-                    }
-
-                    if (!close) {
-                        std::string_view input = connection.input();
-                        if (!input.empty()) {
-                            const std::size_t length = input.size();
-                            if (!connection.queue_output(input)) {
-                                close = true;
-                            } else {
-                                connection.consume(length);
-                                queued_output = true;
-                            }
-                        }
-                    }
+                auto read_flag = connection.handle_read();
+                if (read_flag == ReadResult::KError) {
+                    closed = true;
+                } else if (read_flag == ReadResult::KPeerClosed) {
+                    closed = true;
                 }
-
-                if (!close && connection.has_pending_output() &&
-                    ((event & EPOLLOUT) || queued_output)) {
-                    auto write_flag = connection.handle_write();
-                    if (write_flag == WriteResult::KError) {
-                        close = true;
-                    }
+                auto header_flag = parse_header(connection.input());
+                if (header_flag.status == HeaderParseStatus::KTooLarge) {
+                    closed = true;
                 }
-
-                if (!close && (event & EPOLLHUP)) {
-                    close = true;
+                if (header_flag.status == HeaderParseStatus::KComplete) {
+                    connection.tmp_send();
+                    connection.consume(connection.input().size());
                 }
-
-                if (!close && connection.peer_closed() &&
-                    !connection.has_pending_output()) {
-                    close = true;
-                }
-
-                if (close) {
+                if (closed) {
                     close_connection(epoller, connections, it);
-                    continue;
                 }
-
-                std::uint32_t interests = connection.peer_closed()
-                    ? 0U
-                    : kReadEvents;
-                if (connection.has_pending_output()) {
-                    interests |= EPOLLOUT;
-                }
-                epoller.modify(fd, interests);
+                
             }
         }
     }
