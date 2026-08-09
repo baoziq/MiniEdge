@@ -29,10 +29,13 @@ LineParseStatus parse_line(std::string_view input, HttpRequestLine& res) {
     }
     const size_t target_start = method_end + 1; 
     const auto target_end = line.find(" ", target_start);
-    if (target_end == std::string::npos) {
+    if (target_end == std::string::npos || target_end == target_start) {
         return LineParseStatus::KBadRequest;
     }
     const size_t version_start = target_end + 1;
+    if (version_start >= line.size()) {
+        return LineParseStatus::KBadRequest;
+    }
     res.method = line.substr(0, method_end);
     res.target = line.substr(target_start, target_end - target_start);
     res.version = line.substr(version_start, index - version_start);
