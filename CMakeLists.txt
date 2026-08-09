@@ -5,6 +5,8 @@ project(MiniEdge
     LANGUAGES CXX
 )
 
+include(CTest)
+
 add_library(miniedge
     src/tcp_listener.cc
     src/unique_fd.cc
@@ -51,3 +53,26 @@ target_compile_options(miniedge_server PRIVATE
     $<$<CONFIG:Debug>:-g>
     $<$<CONFIG:Debug>:-O0>
 )
+
+if(BUILD_TESTING)
+    add_executable(http_parser_test
+        tests/http_parser_test.cc
+    )
+
+    target_link_libraries(http_parser_test
+        PRIVATE
+            miniedge
+    )
+
+    target_compile_options(http_parser_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+    )
+
+    add_test(
+        NAME http_parser_test
+        COMMAND http_parser_test
+    )
+endif()
