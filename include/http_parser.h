@@ -18,9 +18,22 @@ enum class HeaderParseStatus {
     KTooLarge
 };
 
+enum class LineParseStatus {
+    KComplete,
+    KBadRequest,
+
+};
 struct HeaderParseResult {
     HeaderParseStatus status;
     std::size_t length;
 };
 
 HeaderParseResult parse_header(std::string_view input);
+
+struct HttpRequestLine {
+    std::string method;
+    std::string target;
+    std::string version;
+};
+
+LineParseStatus parse_line(std::string_view input, HttpRequestLine& res);

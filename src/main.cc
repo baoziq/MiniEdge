@@ -99,6 +99,15 @@ void run_server() {
                         close = true;
                         break;
                     }
+                    HttpRequestLine request;
+                    auto line_flag = parse_line(connection.input(), request);
+                    if (line_flag == LineParseStatus::KBadRequest) {
+                        close = true;
+                        break;
+                    }
+                    std::cout << "method: " << request.method << "\n";
+                    std::cout << "target: " << request.target << "\n";
+                    std::cout << "version: " << request.version << "\n";
                     connection.consume(result.length);
                     queued_output = true;
                 }
