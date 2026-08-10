@@ -77,7 +77,6 @@ void run_server() {
                 Connection& connection = it->second;
                 bool close = (event & EPOLLERR) != 0;
                 bool queued_output = false;
-
                 if (!close && !connection.peer_closed() &&
                     (event & (EPOLLIN | EPOLLRDHUP))) {
                     auto read_flag = connection.handle_read();
@@ -86,7 +85,7 @@ void run_server() {
                     }
                 }
                 while (!close) {
-                    const auto result = parse_header(connection.input());
+                    const auto result = parse_header_boundary(connection.input());
 
                     if (result.status == HeaderParseStatus::KIncomplete) {
                         break;
@@ -96,16 +95,17 @@ void run_server() {
                         break;
                     }
                     
-                    HttpRequestLine request;
-                    auto line_flag = parse_line(connection.input(), request);
-                    if (line_flag == LineParseStatus::KBadRequest) {
-                        close = true;
-                        break;
+                    HttpRequest request;
+                    auto header_flag = parse_header_fields(connection.input(), request);
+                    if (header_flag == HeaderFieldsParseStatus::KBadRequest) {
+                        if (!connection.queue_output(BAD_RESPOND)) {
+                            close = true;
+                            break;
+                        }
                     }
-                    std::cout << "method: " << request.method << "\n";
-                    std::cout << "target: " << request.target << "\n";
-                    std::cout << "version: " << request.version << "\n";
-                    if (!connection.queue_output(response)) {
+                    std::cout << "host: " << request.host << "\n";
+                    std::cout << "connection" << request.connection << "\n";
+                    if (!connection.queue_output(CORRECT_RESPOND)) {
                         close = true;
                         break;
                     }
