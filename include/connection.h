@@ -41,12 +41,15 @@ public:
     bool has_pending_output() const noexcept;
     std::size_t pending_output_size() const noexcept;
     bool peer_closed() const noexcept;
+    void mark_close_after_write() noexcept;
+    bool close_after_write() const noexcept;
 private:
     UniqueFd fd_;
     std::string input_buffer_;
     std::string output_buffer_;
     std::size_t write_offset_{0};
     bool peer_closed_{false};
+    bool close_after_write_{false};
 };
 
 static_assert(!std::is_copy_constructible_v<Connection>);

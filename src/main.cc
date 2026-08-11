@@ -77,43 +77,56 @@ void run_server() {
                 Connection& connection = it->second;
                 bool close = (event & EPOLLERR) != 0;
                 bool queued_output = false;
-                bool error = false;
                 if (!close && !connection.peer_closed() &&
+                    !connection.close_after_write() &&
                     (event & (EPOLLIN | EPOLLRDHUP))) {
                     auto read_flag = connection.handle_read();
                     if (read_flag == ReadResult::KError) {
                         close = true;
                     }
                 }
-                while (!close) {
+                while (!close && !connection.close_after_write()) {
                     const auto result = parse_header_boundary(connection.input());
 
                     if (result.status == HeaderParseStatus::KIncomplete) {
                         break;
                     }
                     if (result.status == HeaderParseStatus::KTooLarge) {
-                        close = true;
+                        if (!connection.queue_output(BAD_RESPONSE)) {
+                            close = true;
+                            break;
+                        }
+                        connection.mark_close_after_write();
+                        queued_output = true;
                         break;
                     }
-                    
-                    HttpRequest request;
-                    auto header_flag = parse_header_fields(connection.input(), request);
+
+                    HttpRequest request{};
+                    const auto header_flag =
+                        parse_header_fields(connection.input(), request);
                     if (header_flag == HeaderFieldsParseStatus::KBadRequest) {
                         if (!connection.queue_output(BAD_RESPONSE)) {
                             close = true;
-                            error = true;
                             break;
                         }
+                        connection.mark_close_after_write();
+                        queued_output = true;
+                        break;
                     }
-                    if (!connection.queue_output(CORRECT_RESPONSE)) {
+
+                    const std::string_view response = request.keep_alive
+                        ? OK_KEEP_ALIVE_RESPONSE
+                        : OK_CLOSE_RESPONSE;
+                    if (!connection.queue_output(response)) {
                         close = true;
                         break;
                     }
-                    if (header_flag == HeaderFieldsParseStatus::KClose) {
-                        close = true;
-                    }
                     connection.consume(result.length);
                     queued_output = true;
+                    if (!request.keep_alive) {
+                        connection.mark_close_after_write();
+                        break;
+                    }
                 }
                 // 当前事件中，顺便发了
                 if (!close && connection.has_pending_output() &&
@@ -122,16 +135,14 @@ void run_server() {
                     if (write_flag == WriteResult::KError) {
                         close = true;
                     }
-                    if (error) {
-                        close_connection(epoller, connections, it);
-                    }
                 }
 
                 if (!close && (event & EPOLLHUP)) {
                     close = true;
                 }
 
-                if (!close && connection.peer_closed() &&
+                if (!close &&
+                    (connection.peer_closed() || connection.close_after_write()) &&
                     !connection.has_pending_output()) {
                     close = true;
                 }
@@ -141,7 +152,8 @@ void run_server() {
                     continue;
                 }
 
-                std::uint32_t interests = connection.peer_closed()
+                std::uint32_t interests =
+                    (connection.peer_closed() || connection.close_after_write())
                     ? 0U
                     : kReadEvents;
                 if (connection.has_pending_output()) {

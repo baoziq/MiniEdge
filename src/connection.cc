@@ -107,3 +107,11 @@ std::size_t Connection::pending_output_size() const noexcept {
 bool Connection::peer_closed() const noexcept {
     return peer_closed_;
 }
+
+void Connection::mark_close_after_write() noexcept {
+    close_after_write_ = true;
+}
+
+bool Connection::close_after_write() const noexcept {
+    return close_after_write_;
+}

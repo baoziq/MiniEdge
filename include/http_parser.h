@@ -1,21 +1,26 @@
 #pragma once
-#include <unistd.h>
 #include <cstddef>
-#include <string_view>
 #include <string>
+#include <string_view>
 
 constexpr std::size_t kMaxHeaderSize = 16 * 1024;
-constexpr std::string_view CORRECT_RESPONSE =
-                                "HTTP/1.1 200 OK\r\n"
-                                "Content-Length: 2\r\n"
-                                "Connection: keep-alive\r\n"
-                                "\r\n"
-                                "OK";
+constexpr std::string_view OK_KEEP_ALIVE_RESPONSE =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Length: 2\r\n"
+    "Connection: keep-alive\r\n"
+    "\r\n"
+    "OK";
+constexpr std::string_view OK_CLOSE_RESPONSE =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Length: 2\r\n"
+    "Connection: close\r\n"
+    "\r\n"
+    "OK";
 constexpr std::string_view BAD_RESPONSE =
     "HTTP/1.1 400 Bad Request\r\n"
     "Content-Length: 0\r\n"
     "Connection: close\r\n"
-    "\r\n";                    
+    "\r\n";
 enum class HeaderParseStatus {
     KIncomplete,
     KComplete,
@@ -24,14 +29,12 @@ enum class HeaderParseStatus {
 
 enum class LineParseStatus {
     KComplete,
-    KBadRequest,
-
+    KBadRequest
 };
 
 enum class HeaderFieldsParseStatus {
     KComplete,
-    KBadRequest,
-    KClose,
+    KBadRequest
 };
 struct HeaderParseResult {
     HeaderParseStatus status;
@@ -52,7 +55,7 @@ struct HttpRequest {
     HttpRequestLine request_line;
     std::string_view host;
     std::string_view connection;
-    bool keep_alive;
+    bool keep_alive{false};
 };
 
 HeaderFieldsParseStatus parse_header_fields(std::string_view input, HttpRequest& request);
