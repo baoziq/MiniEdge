@@ -98,16 +98,17 @@ void run_server() {
                     HttpRequest request;
                     auto header_flag = parse_header_fields(connection.input(), request);
                     if (header_flag == HeaderFieldsParseStatus::KBadRequest) {
-                        if (!connection.queue_output(BAD_RESPOND)) {
+                        if (!connection.queue_output(BAD_RESPONSE)) {
                             close = true;
                             break;
                         }
                     }
-                    std::cout << "host: " << request.host << "\n";
-                    std::cout << "connection" << request.connection << "\n";
-                    if (!connection.queue_output(CORRECT_RESPOND)) {
+                    if (!connection.queue_output(CORRECT_RESPONSE)) {
                         close = true;
                         break;
+                    }
+                    if (header_flag == HeaderFieldsParseStatus::KClose) {
+                        close = true;
                     }
                     connection.consume(result.length);
                     queued_output = true;

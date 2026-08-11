@@ -5,13 +5,17 @@
 #include <string>
 
 constexpr std::size_t kMaxHeaderSize = 16 * 1024;
-constexpr std::string_view CORRECT_RESPOND =
+constexpr std::string_view CORRECT_RESPONSE =
                                 "HTTP/1.1 200 OK\r\n"
                                 "Content-Length: 2\r\n"
                                 "Connection: keep-alive\r\n"
                                 "\r\n"
                                 "OK";
-constexpr std::string_view  BAD_RESPOND = "400 Bad Request";                    
+constexpr std::string_view BAD_RESPONSE =
+    "HTTP/1.1 400 Bad Request\r\n"
+    "Content-Length: 0\r\n"
+    "Connection: close\r\n"
+    "\r\n";                    
 enum class HeaderParseStatus {
     KIncomplete,
     KComplete,
@@ -46,9 +50,10 @@ LineParseStatus parse_line(std::string_view input, HttpRequestLine& res);
 
 struct HttpRequest {
     HttpRequestLine request_line;
-    std::string host;
-    std::string connection;
+    std::string_view host;
+    std::string_view connection;
     bool keep_alive;
 };
 
 HeaderFieldsParseStatus parse_header_fields(std::string_view input, HttpRequest& request);
+bool iequals(std::string_view a, std::string_view b);
