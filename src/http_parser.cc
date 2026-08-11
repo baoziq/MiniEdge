@@ -56,16 +56,20 @@ HeaderFieldsParseStatus parse_header_fields(std::string_view input, HttpRequest&
     auto header_end = input.find("\r\n\r\n");
     while (header_start < header_end) {
         auto line_end = input.find("\r\n", header_start);
-        auto colon_index = input.find(":", header_start);
-        auto line = input.substr(colon_index + 2, line_end - colon_index);
-        auto header_key = input.substr(header_start, colon_index - header_start);
-        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front()))) {
-            line.remove_prefix(1);
+        auto current_line = input.substr(header_start, line_end - header_start);
+        auto colon_index = current_line.find(":");
+        if (colon_index == std::string::npos) {
+            return HeaderFieldsParseStatus::KBadRequest;
         }
-        while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) {
-            line.remove_suffix(1);
+        auto header_key = current_line.substr(0, colon_index);
+        current_line = current_line.substr(colon_index + 1);
+        while (!current_line.empty() && std::isspace(static_cast<unsigned char>(current_line.front()))) {
+            current_line.remove_prefix(1);
         }
-        auto header_value = line;
+        while (!current_line.empty() && std::isspace(static_cast<unsigned char>(current_line.back()))) {
+            current_line.remove_suffix(1);
+        }
+        auto header_value = current_line;
         if (iequals(header_key, "host")) {
             request.host = header_value;
         } else if (iequals(header_key, "connection")) {

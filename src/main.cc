@@ -77,6 +77,7 @@ void run_server() {
                 Connection& connection = it->second;
                 bool close = (event & EPOLLERR) != 0;
                 bool queued_output = false;
+                bool error = false;
                 if (!close && !connection.peer_closed() &&
                     (event & (EPOLLIN | EPOLLRDHUP))) {
                     auto read_flag = connection.handle_read();
@@ -100,6 +101,7 @@ void run_server() {
                     if (header_flag == HeaderFieldsParseStatus::KBadRequest) {
                         if (!connection.queue_output(BAD_RESPONSE)) {
                             close = true;
+                            error = true;
                             break;
                         }
                     }
@@ -113,12 +115,15 @@ void run_server() {
                     connection.consume(result.length);
                     queued_output = true;
                 }
-                
+                // 当前事件中，顺便发了
                 if (!close && connection.has_pending_output() &&
                     ((event & EPOLLOUT) || queued_output)) {
                     auto write_flag = connection.handle_write();
                     if (write_flag == WriteResult::KError) {
                         close = true;
+                    }
+                    if (error) {
+                        close_connection(epoller, connections, it);
                     }
                 }
 

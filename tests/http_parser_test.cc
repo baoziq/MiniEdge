@@ -94,6 +94,19 @@ void test_nonclose_header() {
     expect(res == HeaderFieldsParseStatus::KComplete, "test_bad_request_headerstatus");
 }
 
+void test_blank() {
+    const std::string_view input = "GET /index.html HTTP/1.1\r\n"
+                                "Host:localhost\r\n"
+                                "Connection:close\r\n"
+                                "User-Agent: curl/8.0\r\n"
+                                "\r\n";
+    HttpRequest request;
+    const auto res = parse_header_fields(input, request);
+    expect(request.host == "localhost", "blank host");
+    expect(request.connection == "close", "blank connection");
+    expect(res == HeaderFieldsParseStatus::KClose, "blank status");
+}
+
 int main() {
     test_complete_line();
     test_missing_target();
