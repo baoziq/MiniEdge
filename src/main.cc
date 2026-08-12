@@ -132,17 +132,12 @@ void run_server() {
                 //         close = true;
                 //     }
                 // }
-                if (connection.has_pending_output()) {
-                    std::cout << "add out\n";
-                    epoller.modify(fd, EPOLLOUT);
-                }
 
-                if (!close && event == EPOLLOUT) {
+                if (!close && event & EPOLLOUT) {
                     auto write_flag = connection.handle_write();
                     if (write_flag == WriteResult::KError) {
                         close = true;
                     } else if (write_flag == WriteResult::KDrained) {
-                        std::cout << "del out add in\n";
                         epoller.modify(fd, EPOLLIN);
                     }
                 }
