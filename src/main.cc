@@ -76,7 +76,6 @@ void run_server() {
                 }
                 Connection& connection = it->second;
                 bool close = (event & EPOLLERR) != 0;
-                bool queued_output = false;
                 if (!close && !connection.peer_closed() &&
                     !connection.close_after_write() &&
                     (event & (EPOLLIN | EPOLLRDHUP))) {
@@ -97,7 +96,6 @@ void run_server() {
                             break;
                         }
                         connection.mark_close_after_write();
-                        queued_output = true;
                         break;
                     }
 
@@ -110,7 +108,6 @@ void run_server() {
                             break;
                         }
                         connection.mark_close_after_write();
-                        queued_output = true;
                         break;
                     }
 
@@ -122,21 +119,33 @@ void run_server() {
                         break;
                     }
                     connection.consume(result.length);
-                    queued_output = true;
                     if (!request.keep_alive) {
                         connection.mark_close_after_write();
                         break;
                     }
                 }
-                // 当前事件中，顺便发了
-                if (!close && connection.has_pending_output() &&
-                    ((event & EPOLLOUT) || queued_output)) {
+                // // 当前事件中，顺便发了
+                // if (!close && connection.has_pending_output() &&
+                //     ((event & EPOLLOUT) || queued_output)) {
+                //     auto write_flag = connection.handle_write();
+                //     if (write_flag == WriteResult::KError) {
+                //         close = true;
+                //     }
+                // }
+                if (connection.has_pending_output()) {
+                    std::cout << "add out\n";
+                    epoller.modify(fd, EPOLLOUT);
+                }
+
+                if (!close && event == EPOLLOUT) {
                     auto write_flag = connection.handle_write();
                     if (write_flag == WriteResult::KError) {
                         close = true;
+                    } else if (write_flag == WriteResult::KDrained) {
+                        std::cout << "del out add in\n";
+                        epoller.modify(fd, EPOLLIN);
                     }
                 }
-
                 if (!close && (event & EPOLLHUP)) {
                     close = true;
                 }
