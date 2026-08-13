@@ -6,6 +6,7 @@
 #include "http_parser.h"
 
 #include <cerrno>
+#include <chrono>
 #include <climits>
 #include <cstdint>
 #include <cstdio>
@@ -45,7 +46,7 @@ void run_server() {
     Epoller epoller(1024);
     epoller.add(listener.fd(), EPOLLIN);
     while (true) {
-        int ready = epoller.wait(-1);
+        int ready = epoller.wait(KTimerTickMs);
         for (int i = 0; i < ready; i++) {
             int fd = epoller.event(i).data.fd;
             std::uint32_t event = epoller.event(i).events;
@@ -154,6 +155,11 @@ void run_server() {
                     interests |= EPOLLOUT;
                 }
                 epoller.modify(fd, interests);
+                constexpr auto KIdleTimeout = std::chrono::seconds(30);
+                const auto now = Connection::Clock::now();
+                if (connection.idle_expired(now, KIdleTimeout)) {
+                    close_connection(epoller, connections, it);
+                }
             }
         }
     }

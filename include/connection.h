@@ -5,9 +5,12 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <chrono>
 
 inline constexpr std::size_t KMaxInputSize = 1024 * 1024;
 inline constexpr std::size_t KMaxOutputSize = 1024 * 1024;
+
+constexpr int KTimerTickMs = 1000;
 
 enum class ReadResult {
     KDataAvailable,
@@ -43,6 +46,10 @@ public:
     bool peer_closed() const noexcept;
     void mark_close_after_write() noexcept;
     bool close_after_write() const noexcept;
+
+    using Clock = std::chrono::steady_clock;
+    void touch() noexcept;
+    bool idle_expired(Clock::time_point now, Clock::duration timeout) const noexcept;
 private:
     UniqueFd fd_;
     std::string input_buffer_;
@@ -50,6 +57,7 @@ private:
     std::size_t write_offset_{0};
     bool peer_closed_{false};
     bool close_after_write_{false};
+    Clock::time_point last_active_time_{Clock::now()};
 };
 
 static_assert(!std::is_copy_constructible_v<Connection>);

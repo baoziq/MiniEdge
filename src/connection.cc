@@ -21,6 +21,7 @@ ReadResult Connection::handle_read() {
             if (length > KMaxInputSize - input_buffer_.size()) {
                 return ReadResult::KError;
             }
+            touch();
             input_buffer_.append(buffer, length);
         } else if (n == 0) {
             peer_closed_ = true;
@@ -76,6 +77,7 @@ WriteResult Connection::handle_write() {
         );
 
         if (n > 0) {
+            touch();
             write_offset_ += static_cast<std::size_t>(n);
             continue;
         }
@@ -114,4 +116,12 @@ void Connection::mark_close_after_write() noexcept {
 
 bool Connection::close_after_write() const noexcept {
     return close_after_write_;
+}
+
+void Connection::touch() noexcept {
+    last_active_time_ = Clock::now();
+}
+
+bool Connection::idle_expired(Clock::time_point now, Clock::duration timeout) const noexcept {
+    return now - last_active_time_ > timeout;
 }
