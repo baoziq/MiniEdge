@@ -124,22 +124,12 @@ void run_server() {
                         break;
                     }
                 }
-                // // 当前事件中，顺便发了
-                // if (!close && connection.has_pending_output() &&
-                //     ((event & EPOLLOUT) || queued_output)) {
-                //     auto write_flag = connection.handle_write();
-                //     if (write_flag == WriteResult::KError) {
-                //         close = true;
-                //     }
-                // }
 
                 if (!close && event & EPOLLOUT) {
                     auto write_flag = connection.handle_write();
                     if (write_flag == WriteResult::KError) {
                         close = true;
-                    } else if (write_flag == WriteResult::KDrained) {
-                        epoller.modify(fd, EPOLLIN);
-                    }
+                    } 
                 }
                 if (!close && (event & EPOLLHUP)) {
                     close = true;
