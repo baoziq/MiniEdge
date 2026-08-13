@@ -19,6 +19,8 @@
 #include <unordered_map>
 
 using Connections = std::unordered_map<int, Connection>;
+constexpr auto KIdleTimeout = std::chrono::seconds(30);
+constexpr int KTimerTickMs = 1000;
 
 void close_connection(Epoller& epoller, Connections& connections,
                       Connections::iterator it) noexcept {
@@ -155,11 +157,15 @@ void run_server() {
                     interests |= EPOLLOUT;
                 }
                 epoller.modify(fd, interests);
-                constexpr auto KIdleTimeout = std::chrono::seconds(30);
-                const auto now = Connection::Clock::now();
-                if (connection.idle_expired(now, KIdleTimeout)) {
-                    close_connection(epoller, connections, it);
-                }
+            }
+        }
+        const auto now = Connection::Clock::now();
+        for (auto it = connections.begin(); it != connections.end();) {
+            if (it->second.idle_expired(now, KIdleTimeout)) {
+                auto expired_it = it++;
+                close_connection(epoller, connections, expired_it);
+            } else {
+                it++;
             }
         }
     }

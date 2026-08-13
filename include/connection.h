@@ -10,7 +10,7 @@
 inline constexpr std::size_t KMaxInputSize = 1024 * 1024;
 inline constexpr std::size_t KMaxOutputSize = 1024 * 1024;
 
-constexpr int KTimerTickMs = 1000;
+
 
 enum class ReadResult {
     KDataAvailable,
