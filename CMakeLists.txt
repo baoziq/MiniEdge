@@ -14,6 +14,7 @@ add_library(miniedge
     src/epoller.cc
     src/connection.cc
     src/http_parser.cc
+    src/upstream_connector.cc
 )
 
 target_include_directories(miniedge
@@ -74,5 +75,34 @@ if(BUILD_TESTING)
     add_test(
         NAME http_parser_test
         COMMAND http_parser_test
+    )
+
+    add_executable(upstream_connector_test
+        tests/upstream_connector_test.cc
+        src/upstream_connector.cc
+        src/common.cc
+        src/unique_fd.cc
+    )
+
+    target_include_directories(upstream_connector_test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+
+    target_compile_features(upstream_connector_test
+        PRIVATE
+            cxx_std_17
+    )
+
+    target_compile_options(upstream_connector_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+    )
+
+    add_test(
+        NAME upstream_connector_test
+        COMMAND upstream_connector_test
     )
 endif()

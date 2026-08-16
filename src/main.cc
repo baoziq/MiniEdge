@@ -22,7 +22,8 @@
 using Connections = std::unordered_map<int, Connection>;
 constexpr auto KIdleTimeout = std::chrono::seconds(30);
 constexpr int KTimerTickMs = 1000;
-Epoller epoller(1024);
+constexpr int KUpstreamConnectTimeoutMs = 5000;
+
 void close_connection(Epoller& epoller, Connections& connections,
                       Connections::iterator it) noexcept {
     const int fd = it->first;
@@ -46,7 +47,7 @@ void run_server() {
             "set_nonblocking listener"
         );
     }
-    
+    Epoller epoller(1024);
     epoller.add(listener.fd(), EPOLLIN);
     while (true) {
         int ready = epoller.wait(KTimerTickMs);
@@ -173,20 +174,49 @@ void run_server() {
 }
 
 
-void proxy_server() {
-    auto res = connect_upstream("127.0.0.1", 9000);
-    if (res.status == ConnectStatus::KConnected) {
-        std::cout << "connect success\n";
-        return;
+UniqueFd proxy_server() {
+    auto result = connect_upstream("127.0.0.1", 9000);
+    if (result.status == ConnectStatus::KError) {
+        throw std::system_error(
+            result.error_code,
+            std::generic_category(),
+            "connect upstream"
+        );
     }
-    if (res.status == ConnectStatus::KInProgress) {
-        const int fd = res.fd.get();
-        epoller.add(fd, EPOLLOUT);
-        
+
+    if (result.status == ConnectStatus::KInProgress) {
+        Epoller connect_epoller(1);
+        const int fd = result.fd.get();
+        connect_epoller.add(fd, EPOLLOUT | EPOLLERR | EPOLLHUP);
+
+        const int ready = connect_epoller.wait(KUpstreamConnectTimeoutMs);
+        if (ready == 0) {
+            throw std::system_error(
+                ETIMEDOUT,
+                std::generic_category(),
+                "connect upstream timeout"
+            );
+        }
+
+        const auto check_result = check_connect_result(fd);
+        connect_epoller.remove(fd);
+        if (check_result.status == ConnectStatus::KError) {
+            throw std::system_error(
+                check_result.error_code,
+                std::generic_category(),
+                "connect upstream completion"
+            );
+        }
     }
+
+    std::cout << "upstream connected to 127.0.0.1:9000\n";
+    return std::move(result.fd);
 }
+
 int main() {
     try {
+        auto upstream = proxy_server();
+        (void)upstream;
         run_server();
         return 0;
     } catch (const std::exception& error) {

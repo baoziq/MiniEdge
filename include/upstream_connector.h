@@ -4,7 +4,6 @@
 
 #include <cstdint>
 #include <string_view>
-#include <sys/socket.h>
 
 enum class ConnectStatus {
     KConnected,
@@ -14,14 +13,14 @@ enum class ConnectStatus {
 
 struct ConnectResult {
     UniqueFd fd;
-    ConnectStatus status;
-    int error_code;
+    ConnectStatus status{ConnectStatus::KError};
+    int error_code{0};
 };
 
 struct ConnectCheckResult {
-    ConnectStatus status;
-    int error_code;
+    ConnectStatus status{ConnectStatus::KError};
+    int error_code{0};
 };
 
-ConnectResult connect_upstream(std::string_view ip, std::uint64_t port);
-ConnectCheckResult check_connect_result(UniqueFd fd);
+ConnectResult connect_upstream(std::string_view ip, std::uint16_t port);
+ConnectCheckResult check_connect_result(int fd) noexcept;
