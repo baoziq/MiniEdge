@@ -4,6 +4,7 @@
 #include "epoller.h"
 #include "connection.h"
 #include "http_parser.h"
+#include "upstream_connector.h"
 
 #include <cerrno>
 #include <chrono>
@@ -21,7 +22,7 @@
 using Connections = std::unordered_map<int, Connection>;
 constexpr auto KIdleTimeout = std::chrono::seconds(30);
 constexpr int KTimerTickMs = 1000;
-
+Epoller epoller(1024);
 void close_connection(Epoller& epoller, Connections& connections,
                       Connections::iterator it) noexcept {
     const int fd = it->first;
@@ -45,7 +46,7 @@ void run_server() {
             "set_nonblocking listener"
         );
     }
-    Epoller epoller(1024);
+    
     epoller.add(listener.fd(), EPOLLIN);
     while (true) {
         int ready = epoller.wait(KTimerTickMs);
@@ -171,6 +172,19 @@ void run_server() {
     }
 }
 
+
+void proxy_server() {
+    auto res = connect_upstream("127.0.0.1", 9000);
+    if (res.status == ConnectStatus::KConnected) {
+        std::cout << "connect success\n";
+        return;
+    }
+    if (res.status == ConnectStatus::KInProgress) {
+        const int fd = res.fd.get();
+        epoller.add(fd, EPOLLOUT);
+        
+    }
+}
 int main() {
     try {
         run_server();
