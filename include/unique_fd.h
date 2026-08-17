@@ -4,7 +4,8 @@
 
 class UniqueFd {
 public:
-    UniqueFd(int fd = -1);
+    UniqueFd() noexcept;
+    explicit UniqueFd(int fd) noexcept;
     UniqueFd(const UniqueFd&) = delete;
     UniqueFd& operator=(const UniqueFd&) = delete;
     UniqueFd(UniqueFd&& other) noexcept;

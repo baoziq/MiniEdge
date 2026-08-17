@@ -1,22 +1,43 @@
 #include "session_registry.h"
-#include "unique_fd.h"
-#include <optional>
+
+#include <utility>
 
 bool SessionRegistry::create(int client_fd) {
+    if (client_fd < 0) {
+        return false;
+    }
+
     ProxySession session{client_fd, std::nullopt};
-    auto [it, inserted] = sessions_.try_emplace(client_fd, std::move(session));
+    const auto [it, inserted] =
+        sessions_.try_emplace(client_fd, std::move(session));
+    (void)it;
     return inserted;
 }
 
 bool SessionRegistry::bind_upstream(int client_fd, UniqueFd upstream_fd) {
-    auto it = sessions_.find(client_fd);
-    if (it == sessions_.end() || it->second.upstream_fd.has_value()) {
+    auto session_it = sessions_.find(client_fd);
+    if (session_it == sessions_.end() ||
+        session_it->second.upstream_fd.has_value() ||
+        !upstream_fd.valid()) {
         return false;
     }
-    
-    it->second.upstream_fd = std::move(upstream_fd);
-    auto [it1, inserted] = upstream_to_client_.try_emplace(it->second.upstream_fd->get(), client_fd);
-    return inserted;
+
+    const int upstream_fd_number = upstream_fd.get();
+    if (upstream_fd_number == client_fd ||
+        upstream_to_client_.find(upstream_fd_number) !=
+            upstream_to_client_.end()) {
+        return false;
+    }
+
+    const auto [mapping_it, inserted] =
+        upstream_to_client_.try_emplace(upstream_fd_number, client_fd);
+    (void)mapping_it;
+    if (!inserted) {
+        return false;
+    }
+
+    session_it->second.upstream_fd.emplace(std::move(upstream_fd));
+    return true;
 }
 
 ProxySession* SessionRegistry::find_by_client(int client_fd) {
@@ -45,13 +66,12 @@ bool SessionRegistry::erase_by_client(int client_fd) {
     if (it == sessions_.end()) {
         return false;
     }
-    if (!it->second.upstream_fd.has_value()) {
-        return false;
-    }
+
     if (it->second.upstream_fd.has_value()) {
-        int upstream_fd = it->second.upstream_fd->get();
+        const int upstream_fd = it->second.upstream_fd->get();
         upstream_to_client_.erase(upstream_fd);
     }
+
     sessions_.erase(it);
     return true;
 }

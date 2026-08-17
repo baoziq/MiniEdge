@@ -1,6 +1,8 @@
 #include "unique_fd.h"
 
-UniqueFd::UniqueFd(int fd) : fd_(fd){}
+UniqueFd::UniqueFd() noexcept : fd_(-1) {}
+
+UniqueFd::UniqueFd(int fd) noexcept : fd_(fd) {}
 
 UniqueFd::UniqueFd(UniqueFd&& other) noexcept : fd_(other.fd_){
     other.fd_ = -1;
