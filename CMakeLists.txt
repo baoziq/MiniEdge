@@ -15,6 +15,7 @@ add_library(miniedge
     src/connection.cc
     src/http_parser.cc
     src/upstream_connector.cc
+    src/session_registry.cc
 )
 
 target_include_directories(miniedge
@@ -76,12 +77,13 @@ if(BUILD_TESTING)
         NAME http_parser_test
         COMMAND http_parser_test
     )
-
+    
     add_executable(upstream_connector_test
         tests/upstream_connector_test.cc
         src/upstream_connector.cc
         src/common.cc
         src/unique_fd.cc
+        src/session_registry.cc
     )
 
     target_include_directories(upstream_connector_test
@@ -104,5 +106,33 @@ if(BUILD_TESTING)
     add_test(
         NAME upstream_connector_test
         COMMAND upstream_connector_test
+    )
+
+   add_executable(session_registry_test
+        tests/session_registry_test.cc
+        src/session_registry.cc
+        src/unique_fd.cc
+    )
+
+    target_include_directories(session_registry_test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+
+    target_compile_features(session_registry_test
+        PRIVATE
+            cxx_std_17
+    )
+
+    target_compile_options(session_registry_test
+        PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+    )
+
+    add_test(
+        NAME session_registry_test
+        COMMAND session_registry_test
     )
 endif()
