@@ -5,6 +5,7 @@
 #include "connection.h"
 #include "http_parser.h"
 #include "upstream_connector.h"
+#include "session_registry.h"
 
 #include <cerrno>
 #include <chrono>
@@ -35,7 +36,7 @@ void close_connection(Epoller& epoller, Connections& connections,
     }
     connections.erase(it);
 }
-
+UniqueFd proxy_server();
 void run_server() {
     std::unordered_map<int, Connection> connections;
 
@@ -48,6 +49,7 @@ void run_server() {
         );
     }
     Epoller epoller(1024);
+    SessionRegistry registry{};
     epoller.add(listener.fd(), EPOLLIN);
     while (true) {
         int ready = epoller.wait(KTimerTickMs);
@@ -74,11 +76,14 @@ void run_server() {
                     continue;
                 }
                 epoller.add(client_fd, kReadEvents);
-            } else {
+                registry.create(client_fd);
+            } else if (registry.find_by_upstream(fd) == nullptr) {
+                // client_fd
                 auto it = connections.find(fd);
                 if (it == connections.end()) {
                     continue;
                 }
+                
                 Connection& connection = it->second;
                 bool close = (event & EPOLLERR) != 0;
                 if (!close && !connection.peer_closed() &&
@@ -115,7 +120,28 @@ void run_server() {
                         connection.mark_close_after_write();
                         break;
                     }
+                    // 请求头解析成功
+                    ProxySession* session = registry.find_by_client(fd);
+                    if (session->state == ProxyState::KReadingRequest) {
+                        auto result = connect_upstream("127.0.0.1", 9000);
+                        if (result.status == ConnectStatus::KError) {
+                            // 连接上游出错
+                            registry.erase_by_client(fd);
+                            continue;
+                        } 
+                        if (!registry.bind_upstream(fd, std::move(result.fd))) {
+                            // 绑定失败
+                            registry.erase_by_client(fd);
+                        }
+                        if (result.status == ConnectStatus::KInProgress) {
+                            // 监听EPOLLOUT
+                            epoller.modify(fd, EPOLLOUT);
+                        } else {
+                            session->state = ProxyState::KSendingResponse;
+                            epoller.add(session->upstream_fd->get(), EPOLLIN);
+                        }
 
+                    }
                     const std::string_view response = request.keep_alive
                         ? OK_KEEP_ALIVE_RESPONSE
                         : OK_CLOSE_RESPONSE;
@@ -159,6 +185,19 @@ void run_server() {
                     interests |= EPOLLOUT;
                 }
                 epoller.modify(fd, interests);
+            } else if (registry.find_by_upstream(fd) != nullptr) {
+                // upstream_fd
+                auto session = registry.find_by_upstream(fd);
+                if (session->state == ProxyState::KConnectingUpstream && event & EPOLLOUT) {
+                    auto result = check_connect_result(fd);
+                    if (result.status == ConnectStatus::KError) {
+                        // 清理回话
+                        registry.erase_by_client(fd);
+                        continue;
+                    }
+                    session->state = ProxyState::KSendingResponse;
+
+                }
             }
         }
         const auto now = Connection::Clock::now();
@@ -174,49 +213,8 @@ void run_server() {
 }
 
 
-UniqueFd proxy_server() {
-    auto result = connect_upstream("127.0.0.1", 9000);
-    if (result.status == ConnectStatus::KError) {
-        throw std::system_error(
-            result.error_code,
-            std::generic_category(),
-            "connect upstream"
-        );
-    }
-
-    if (result.status == ConnectStatus::KInProgress) {
-        Epoller connect_epoller(1);
-        const int fd = result.fd.get();
-        connect_epoller.add(fd, EPOLLOUT | EPOLLERR | EPOLLHUP);
-
-        const int ready = connect_epoller.wait(KUpstreamConnectTimeoutMs);
-        if (ready == 0) {
-            throw std::system_error(
-                ETIMEDOUT,
-                std::generic_category(),
-                "connect upstream timeout"
-            );
-        }
-
-        const auto check_result = check_connect_result(fd);
-        connect_epoller.remove(fd);
-        if (check_result.status == ConnectStatus::KError) {
-            throw std::system_error(
-                check_result.error_code,
-                std::generic_category(),
-                "connect upstream completion"
-            );
-        }
-    }
-
-    std::cout << "upstream connected to 127.0.0.1:9000\n";
-    return std::move(result.fd);
-}
-
 int main() {
     try {
-        auto upstream = proxy_server();
-        (void)upstream;
         run_server();
         return 0;
     } catch (const std::exception& error) {
