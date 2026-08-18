@@ -4,18 +4,6 @@
 #include <string_view>
 
 constexpr std::size_t kMaxHeaderSize = 16 * 1024;
-constexpr std::string_view OK_KEEP_ALIVE_RESPONSE =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 2\r\n"
-    "Connection: keep-alive\r\n"
-    "\r\n"
-    "OK";
-constexpr std::string_view OK_CLOSE_RESPONSE =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Length: 2\r\n"
-    "Connection: close\r\n"
-    "\r\n"
-    "OK";
 constexpr std::string_view BAD_RESPONSE =
     "HTTP/1.1 400 Bad Request\r\n"
     "Content-Length: 0\r\n"
