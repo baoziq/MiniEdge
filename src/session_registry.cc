@@ -7,7 +7,8 @@ bool SessionRegistry::create(int client_fd) {
         return false;
     }
 
-    ProxySession session{client_fd, std::nullopt};
+    ProxySession session{};
+    session.client_fd = client_fd;
     const auto [it, inserted] =
         sessions_.try_emplace(client_fd, std::move(session));
     (void)it;

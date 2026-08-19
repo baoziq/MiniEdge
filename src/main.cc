@@ -144,36 +144,59 @@ void run_server() {
                     (event & (EPOLLOUT | EPOLLERR | EPOLLHUP |
                               EPOLLRDHUP))) {
                     const auto result = check_connect_result(fd);
-                    if (result.status == ConnectStatus::KError ||
-                        (event & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))) {
+                    if (result.status == ConnectStatus::KError) {
                         upstream_failed = true;
                     } else {
-                        while (true) {
-                            auto send_size = send(upstream_session->upstream_fd->get(), upstream_session->upstream_output.data(), upstream_session->upstream_output.size(), MSG_NOSIGNAL);
-                            if (send_size > 0) {
-                                upstream_session->upstream_write_offset += send_size;
-                                if (upstream_session->upstream_write_offset >= upstream_session->upstream_output.size()) {
-                                    upstream_session->state =
-                                        ProxyState::KSendingRequest;
-                                    epoller.modify(fd, EPOLLRDHUP);
-                                    break;
-                                }
-                                continue;
-                            } else if (send_size == -1 && errno == EINTR) {
-                                continue;
-                            } else if (send_size == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                                break;
-                            } else {
-                                upstream_failed = true;
-                                break;
-                            }
-
-                        }
-                        
-
+                        upstream_session->state =
+                            ProxyState::KSendingRequest;
                     }
-                } else if (event & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
+                }
+
+                if (!upstream_failed &&
+                    (event & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))) {
                     upstream_failed = true;
+                }
+
+                if (!upstream_failed &&
+                    upstream_session->state == ProxyState::KSendingRequest &&
+                    (event & EPOLLOUT)) {
+                    while (upstream_session->upstream_write_offset <
+                           upstream_session->upstream_output.size()) {
+                        const std::size_t remaining =
+                            upstream_session->upstream_output.size() -
+                            upstream_session->upstream_write_offset;
+                        const ssize_t send_size = send(
+                            fd,
+                            upstream_session->upstream_output.data() +
+                                upstream_session->upstream_write_offset,
+                            remaining,
+                            MSG_NOSIGNAL
+                        );
+
+                        if (send_size > 0) {
+                            upstream_session->upstream_write_offset +=
+                                static_cast<std::size_t>(send_size);
+                            continue;
+                        }
+                        if (send_size < 0 && errno == EINTR) {
+                            continue;
+                        }
+                        if (send_size < 0 &&
+                            (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                            break;
+                        }
+
+                        upstream_failed = true;
+                        break;
+                    }
+
+                    if (!upstream_failed &&
+                        upstream_session->upstream_write_offset ==
+                            upstream_session->upstream_output.size()) {
+                        upstream_session->state =
+                            ProxyState::KReadingResponse;
+                        epoller.modify(fd, EPOLLRDHUP);
+                    }
                 }
 
                 if (upstream_failed) {
@@ -238,9 +261,9 @@ void run_server() {
                     break;
                 }
                 // 请求头解析成功
-                client_session->upstream_output = connection.input().substr(0, result.length);
+                client_session->upstream_output =
+                    connection.input().substr(0, result.length);
                 connection.consume(result.length);
-                client_session->state = ProxyState::KSendingRequest;
                 auto connect_result =
                     connect_upstream("127.0.0.1", 9000);
                 if (connect_result.status == ConnectStatus::KError) {
@@ -274,9 +297,7 @@ void run_server() {
                 }
 
                 const std::uint32_t upstream_interests =
-                    connect_status == ConnectStatus::KInProgress
-                    ? EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP
-                    : EPOLLERR | EPOLLHUP | EPOLLRDHUP;
+                    EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLRDHUP;
                 try {
                     epoller.add(upstream_fd, upstream_interests);
                 } catch (const std::system_error& error) {
@@ -290,7 +311,7 @@ void run_server() {
                         close = true;
                     }
                 }
-                // 今天停在连接成功后的 KSendingRequest，不发送请求。
+                // 今天停在完整请求发送后的 KReadingResponse。
                 break;
             }
 
