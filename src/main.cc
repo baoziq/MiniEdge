@@ -148,9 +148,29 @@ void run_server() {
                         (event & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))) {
                         upstream_failed = true;
                     } else {
-                        upstream_session->state =
-                            ProxyState::KSendingRequest;
-                        epoller.modify(fd, EPOLLRDHUP);
+                        while (true) {
+                            auto send_size = send(upstream_session->upstream_fd->get(), upstream_session->upstream_output.data(), upstream_session->upstream_output.size(), MSG_NOSIGNAL);
+                            if (send_size > 0) {
+                                upstream_session->upstream_write_offset += send_size;
+                                if (upstream_session->upstream_write_offset >= upstream_session->upstream_output.size()) {
+                                    upstream_session->state =
+                                        ProxyState::KSendingRequest;
+                                    epoller.modify(fd, EPOLLRDHUP);
+                                    break;
+                                }
+                                continue;
+                            } else if (send_size == -1 && errno == EINTR) {
+                                continue;
+                            } else if (send_size == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                                break;
+                            } else {
+                                upstream_failed = true;
+                                break;
+                            }
+
+                        }
+                        
+
                     }
                 } else if (event & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
                     upstream_failed = true;
@@ -218,6 +238,9 @@ void run_server() {
                     break;
                 }
                 // 请求头解析成功
+                client_session->upstream_output = connection.input().substr(0, result.length);
+                connection.consume(result.length);
+                client_session->state = ProxyState::KSendingRequest;
                 auto connect_result =
                     connect_upstream("127.0.0.1", 9000);
                 if (connect_result.status == ConnectStatus::KError) {

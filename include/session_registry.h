@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <unordered_map>
+#include <string>
 
 enum class ProxyState{
     KReadingRequest,
@@ -17,6 +18,8 @@ struct ProxySession{
     int client_fd = -1;
     std::optional<UniqueFd> upstream_fd;
     ProxyState state{ProxyState::KReadingRequest};
+    std::string upstream_output;
+    std::size_t upstream_write_offset{0};
 };
 
 class SessionRegistry {
