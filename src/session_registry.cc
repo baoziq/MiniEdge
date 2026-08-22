@@ -42,6 +42,21 @@ bool SessionRegistry::bind_upstream(int client_fd, UniqueFd upstream_fd) {
     return true;
 }
 
+bool SessionRegistry::unbind_upstream(int client_fd) {
+    auto session_it = sessions_.find(client_fd);
+    if (session_it == sessions_.end() ||
+        !session_it->second.upstream_fd.has_value()) {
+        return false;
+    }
+
+    const int upstream_fd = session_it->second.upstream_fd->get();
+    upstream_to_client_.erase(upstream_fd);
+    session_it->second.upstream_fd.reset();
+    session_it->second.upstream_output.clear();
+    session_it->second.upstream_write_offset = 0;
+    return true;
+}
+
 ProxySession* SessionRegistry::find_by_client(int client_fd) {
     auto it = sessions_.find(client_fd);
     if (it == sessions_.end()) {

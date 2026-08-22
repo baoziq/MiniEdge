@@ -16,6 +16,7 @@ add_library(miniedge
     src/http_parser.cc
     src/upstream_connector.cc
     src/session_registry.cc
+    src/proxy_server.cc
 )
 
 target_include_directories(miniedge

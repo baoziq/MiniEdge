@@ -26,6 +26,7 @@ struct ProxySession{
     ProxyState state{ProxyState::KReadingRequest};
     std::string upstream_output;
     std::size_t upstream_write_offset{0};
+    bool upstream_response_started{false};
 };
 
 class SessionRegistry {
@@ -33,6 +34,7 @@ public:
     // 把client_fd加入client到上游的映射表中
     bool create(int client_fd);
     bool bind_upstream(int client_fd, UniqueFd upstream_fd);
+    bool unbind_upstream(int client_fd);
 
     ProxySession* find_by_client(int client_fd);
     ProxySession* find_by_upstream(int upstream_fd);

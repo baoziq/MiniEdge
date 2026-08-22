@@ -9,7 +9,7 @@ int main() {
         server.run();
         return 0;
     } catch (const std::exception& error) {
-        std::cerr << "fatal error" << error.what() << '\n';
+        std::cerr << "fatal error: " << error.what() << '\n';
         return 1;
     }
 }
