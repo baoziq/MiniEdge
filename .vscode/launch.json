@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug GoogleTest",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/miniedge_tests",
+            "args": [
+                "--gtest_filter=LRUCacheTest.Eviction"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb"
+        }
+    ]
+}

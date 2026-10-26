@@ -1,50 +1,28 @@
 #include "lru.h"
 
 #include <cstdlib>
-#include <iostream>
-#include <string_view>
+#include <gtest/gtest.h>
 
-void expect(bool condition, std::string_view test_name) {
-    if (!condition) {
-        std::cerr << "[FAILED] " << test_name << '\n';
-        std::exit(EXIT_FAILURE);
-    }
-    std::cout << "[PASSED] " << test_name << '\n';
+TEST(LRUCacheTest, BasicPutAndGet) {
+    LRU<int, int> cache(2);
+
+    cache.put(1, 100);
+    cache.put(2, 200);
+
+    EXPECT_EQ(cache.get(1), 100);
+    EXPECT_EQ(cache.get(2), 200);
 }
 
-void test_basic() {
-    LRU lru(3);
-    lru.put(1, 1);
-    lru.put(2, 2);
-    lru.put(3, 3);
-    int res = lru.get(2);
-    expect(res == 2, "test_basic");
-}
+TEST(LRUCacheTest, Eviction) {
+    LRU<int, int> cache(2);
 
-void test1() {
-    LRU lru(3);
-    lru.put(1, 1);
-    lru.put(2, 2);
-    lru.put(3, 3);
-    lru.put(4, 4);
-    int res = lru.get(1);
-    expect(res == -1, "test1");
-}
+    cache.put(1, 100);
+    cache.put(2, 200);
 
-void test2() {
-    LRU lru(3);
-    lru.put(1, 1);
-    lru.put(2, 2);
-    lru.put(3, 3);
-    lru.get(1);
-    lru.put(4, 4);
-    int res = lru.get(2);
-    expect(res == -1, "test2");
-}
+    cache.get(1);      // 1 变成最近使用
+    cache.put(3, 300); // 应当淘汰 2
 
-int main() {
-    test_basic();
-    test1();
-    test2();
-    return 0;
+    EXPECT_EQ(cache.get(1), 100);
+    EXPECT_EQ(cache.get(2), std::nullopt);
+    EXPECT_EQ(cache.get(3), 300);
 }
