@@ -2,7 +2,9 @@
 
 #include "common.h"
 #include "http_parser.h"
+#include "session_registry.h"
 #include "upstream_connector.h"
+#include "static_file_handler.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -419,7 +421,25 @@ void ProxyServer::handle_client_event(int client_fd,
             }
             break;
         }
-
+        if (request.request_line.target.substr(0, 8) == "/static/") {
+            std::string response;
+            if (static_cache_.get(request.request_line.target).has_value()) {
+                response = static_cache_.get(request.request_line.target).value();
+                std::cout << "cached\n";
+            } else {
+                response = handle_static_request(request);
+                static_cache_.put(request.request_line.target, response);
+                std::cout << "missing\n";
+            }
+            
+            if (!connection.queue_output(response)) {
+                close = true;
+            } else {
+                session->state = ProxyState::KSendingResponse;
+                connection.mark_close_after_write();
+            }
+            break;
+        }
         session->upstream_output = make_upstream_request(
             connection.input().substr(0, result.length)
         );

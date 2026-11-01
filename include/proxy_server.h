@@ -4,6 +4,8 @@
 #include "epoller.h"
 #include "session_registry.h"
 #include "tcp_listener.h"
+#include "lru.h"
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -16,6 +18,7 @@ public:
                 std::string upstream_host,
                 std::uint16_t upstream_port);
     void run();
+    
 private:
     using Connections = std::unordered_map<int, Connection>;
     
@@ -36,4 +39,8 @@ private:
 
     std::string upstream_host_;
     std::uint16_t upstream_port_;
+
+    LRU<std::string, std::string> static_cache_{100};
+    
+    
 };

@@ -3,10 +3,10 @@ add_library(
     connection.cc
     epoller.cc
     http_parser.cc
-    lru.cc
     proxy_server.cc
     session_registry.cc
     tcp_listener.cc
+    static_file_handler.cc
 )
 
 target_include_directories(miniedge
