@@ -9,6 +9,17 @@ constexpr std::string_view BAD_RESPONSE =
     "Content-Length: 0\r\n"
     "Connection: close\r\n"
     "\r\n";
+
+constexpr std::string_view HEADER_TOO_LARGE =
+    "HTTP/1.1 431 Request Header Fields Too Large\r\n"
+    "Content-Length: 0\r\n"
+    "Connection: close\r\n"
+    "\r\n";
+constexpr std::string_view OK =
+    "HTTP/1.1 200 OK\r\n"
+    "Content-Length: 0\r\n"
+    "Connection: close\r\n"
+    "\r\n";
 enum class HeaderParseStatus {
     KIncomplete,
     KComplete,

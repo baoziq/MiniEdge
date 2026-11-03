@@ -2,15 +2,12 @@
 
 #include "unique_fd.h"
 
-#include <algorithm>
 #include <stdint.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <cerrno>
-#include <system_error>
 #include <optional>
 class Listener {
 public:
