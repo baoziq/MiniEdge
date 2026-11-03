@@ -1,5 +1,4 @@
 #include "static_file_handler.h"
-#include "proxy_server.h"
 
 #include <string>
 #include <sys/stat.h>

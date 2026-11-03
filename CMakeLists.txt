@@ -6,7 +6,7 @@ project(MiniEdge
 )
 
 include(CTest)
-
+find_package(spdlog REQUIRED)
 add_library(miniedge
     src/tcp_listener.cc
     src/unique_fd.cc
@@ -44,6 +44,7 @@ add_executable(miniedge_server
 target_link_libraries(miniedge_server
     PRIVATE
         miniedge
+        spdlog::spdlog
 )
 
 target_compile_options(miniedge_server

@@ -14,6 +14,7 @@
 #include <cstring>
 #include <iostream>
 #include <optional>
+#include <spdlog/spdlog.h>
 #include <string_view>
 #include <sys/epoll.h>
 #include <sys/socket.h>
@@ -110,16 +111,19 @@ void ProxyServer::run() {
 
 void ProxyServer::handle_event(int fd, std::uint32_t events) {
     if (fd == listener_.fd()) {
+        spdlog::info("客户端连接到来");
         accept_client();
         return;
     }
 
     if (registry_.find_by_upstream(fd) != nullptr) {
+        spdlog::info("上游连接到来");
         handle_upstream_event(fd, events);
         return;
     }
 
     if (connections_.find(fd) != connections_.end()) {
+        spdlog::info("客户端发送内容");
         handle_client_event(fd, events);
     }
 }
@@ -150,7 +154,7 @@ void ProxyServer::accept_client() {
     if (!inserted) {
         return;
     }
-
+    spdlog::info("client_fd加入connections中");
     if (!registry_.create(client_fd)) {
         connections_.erase(it);
         return;
@@ -374,6 +378,7 @@ void ProxyServer::handle_client_event(int client_fd,
                                       std::uint32_t events) {
     auto it = connections_.find(client_fd);
     if (it == connections_.end()) {
+        spdlog::info("unknown client_fd");
         return;
     }
 
@@ -387,7 +392,7 @@ void ProxyServer::handle_client_event(int client_fd,
     const bool reading_request =
         session->state == ProxyState::KReadingRequest;
     bool close = (events & EPOLLERR) != 0;
-
+    spdlog::info("before read");
     if (!close && reading_request && !connection.peer_closed() &&
         !connection.close_after_write() &&
         (events & (EPOLLIN | EPOLLRDHUP))) {
@@ -395,7 +400,7 @@ void ProxyServer::handle_client_event(int client_fd,
             close = true;
         }
     }
-
+    spdlog::info("read successed");
     while (!close && reading_request &&
            !connection.close_after_write()) {
         const auto result = parse_header_boundary(connection.input());

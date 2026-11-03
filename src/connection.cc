@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <sys/socket.h>
 #include <unistd.h>
-
+#include <spdlog/spdlog.h>
 Connection::Connection(UniqueFd fd) : fd_(std::move(fd)), input_buffer_(), output_buffer_() {}
 
 int Connection::fd() const noexcept {
@@ -13,6 +13,7 @@ int Connection::fd() const noexcept {
 }
 
 ReadResult Connection::handle_read() {
+    spdlog::info("read");
     char buffer[1024];
     while (true) {
         ssize_t n = read(fd_.get(), &buffer, sizeof(buffer));
@@ -24,6 +25,7 @@ ReadResult Connection::handle_read() {
             touch();
             input_buffer_.append(buffer, length);
         } else if (n == 0) {
+            spdlog::info("peer closed");
             peer_closed_ = true;
             return ReadResult::KPeerClosed;
         } else if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
