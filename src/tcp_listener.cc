@@ -24,7 +24,7 @@ Listener Listener::create(uint16_t port) {
     }
 
     sockaddr_in address{};
-    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     address.sin_family = AF_INET;
     address.sin_port = htons(port);
 

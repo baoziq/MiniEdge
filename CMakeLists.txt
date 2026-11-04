@@ -14,8 +14,6 @@ add_library(miniedge
     src/epoller.cc
     src/connection.cc
     src/http_parser.cc
-    src/upstream_connector.cc
-    src/session_registry.cc
     src/proxy_server.cc
     src/static_file_handler.cc
 )

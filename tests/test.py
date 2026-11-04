@@ -1,20 +1,16 @@
 import socket
 import time
 
-with socket.create_connection(("127.0.0.1", 8001)) as sock:
-    parts = [
-        b"POST /test HTTP/1.1\r\n",
-        b"Host: localhost\r\nContent-Length: 11\r\n",
-        b"\r\nhello",
-        b"=world",
-    ]
+with socket.create_connection(("127.0.0.1", 8001)) as s:
+    s.settimeout(5)
 
-    for i, part in enumerate(parts):
-        print(f"Sending part {i + 1}: {part!r}")
-        sock.sendall(part)
-        time.sleep(1)
+    s.sendall(b"GET / HTTP/1.1\r\nHost: local")
+    time.sleep(1)
 
-    sock.shutdown(socket.SHUT_WR)
+    s.sendall(b"host\r\nConnection: close\r\n")
+    time.sleep(1)
 
-    while data := sock.recv(4096):
+    s.sendall(b"\r\n")
+
+    while data := s.recv(4096):
         print(data.decode(errors="replace"), end="")

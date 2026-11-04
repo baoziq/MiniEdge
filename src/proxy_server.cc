@@ -116,6 +116,7 @@ void ProxyServer::handle_client_event(int client_fd,
         close_session(it);
         return;
     }
+    std::string_view response = OK;
     if (events & EPOLLIN) {
         // request
         auto read_status = connection.handle_read();
@@ -126,26 +127,56 @@ void ProxyServer::handle_client_event(int client_fd,
         auto header_status = parse_header_boundary(connection.input());
         switch (header_status.status) {
         case HeaderParseStatus::KComplete:
-            connection.queue_output(OK);
+            // connection.queue_output(OK);
             break;
         case HeaderParseStatus::KTooLarge:
-            connection.queue_output(HEADER_TOO_LARGE);
-            return;
+            response = HEADER_TOO_LARGE;
+            break;
         case HeaderParseStatus::KIncomplete:
             // todo
             break;
         }
         
-        auto line_status = parse_line(connection.input(), res_);
+        auto line_status = parse_line(connection.input(), request_line_);
         if (line_status == LineParseStatus::KBadRequest) {
-            connection.queue_output(BAD_RESPONSE);
-            return;
+            response = BAD_RESPONSE;
         }
-        auto field_status = parse_header_fields(connection.input(), res_);
+        auto field_status = parse_header_fields(connection.input(), request_);
+        if (field_status == HeaderFieldsParseStatus::KBadRequest) {
+            response = BAD_RESPONSE;
+        }
+        connection.queue_output(response);
+        // spdlog::info("parse_line: {}", request_.request_line);
+        spdlog::info("method: {}", request_line_.method);
+        spdlog::info("target: {}", request_line_.target);
+        spdlog::info("version: {}", request_line_.version);
+        auto write_status = connection.handle_write();
+        switch (write_status) {
+        case WriteResult::KDrained:
+            return;
+        case WriteResult::KError:
+            spdlog::error("write error");
+            break;
+        case WriteResult::KWouldBlock:
+        // todo
+            break;
+        }
     }
 
     if (events & EPOLLOUT) {
         // response
+        spdlog::info("write");
+        auto write_status = connection.handle_write();
+        switch (write_status) {
+        case WriteResult::KDrained:
+            return;
+        case WriteResult::KError:
+            spdlog::error("write error");
+            break;
+        case WriteResult::KWouldBlock:
+        // todo
+            break;
+        }
     }
 }
 

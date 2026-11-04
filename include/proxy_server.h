@@ -33,6 +33,7 @@ private:
     Connections connections_;
 
     LRU<std::string, std::string> static_cache_{100};
-    HttpRequestLine res_;
+    HttpRequestLine request_line_;
+    HttpRequest request_;
     
 };
